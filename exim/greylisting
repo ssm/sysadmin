@@ -1,0 +1,73 @@
+### BEGIN Selective Greylisting
+
+## Stig Sandbeck Mathisen
+
+# Evaluate conditions
+warn
+  !verify     = reverse_host_lookup
+  set acl_c1  = Reverse lookup failed for $sender_host_address
+  log_message = Reverse lookup failed for $sender_host_address
+  delay   = 10s
+
+warn
+  !verify     = helo
+  set acl_c2  = Could not verify HELO $sender_helo_name
+  log_message = Could not verify HELO $sender_helo_name
+  delay   = 5s
+
+warn
+  dnslists    = sbl-xbl.spamhaus.org                               : \
+                dnsbl.sorbs.net                                    : \
+                rhsbl.sorbs.net/$sender_address_domain             : \
+                abuse.rfc-ignorant.org/$sender_address_domain      : \
+                bogusmx.rfc-ignorant.org/$sender_address_domain    : \
+                dsn.rfc-ignorant.org/$sender_address_domain        : \
+                postmaster.rfc-ignorant.org/$sender_address_domain : \
+                whois.rfc-ignorant.org/$sender_address_domain
+  set acl_c3  = $sender_host_address is listed in $dnslist_domain=$dnslist_value
+  log_message = $sender_host_address is listed in $dnslist_domain=$dnslist_value
+  delay   = 15s
+
+# Some logic
+warn
+  condition = ${if def:acl_c3 {1}}
+  set acl_m0  = $acl_c3
+
+warn
+  condition = ${if def:acl_c1 {1}}
+  condition = ${if !def:acl_m0 {1}}
+  set acl_m0  = $acl_c1
+
+warn
+  condition = ${if def:acl_c2 {1}}
+  condition = ${if !def:acl_m0 {1}}
+  set acl_m0  = $acl_c2
+
+# warn
+#   local_parts = CONFDIR/greylistd_users
+#   condition = ${if !def:acl_m0 {1}}
+#   set acl_m0  = user spec
+
+defer
+  message        = $sender_host_address is not yet authorized to deliver \
+                   mail from $sender_address to $local_part@$domain. \
+                   Please try later.
+  log_message    = Greylisted ($acl_m0)
+  !senders       = :
+  !hosts         = : +relay_from_hosts : \
+                     ${if exists {/etc/greylistd/whitelist-hosts}\
+                                 {/etc/greylistd/whitelist-hosts}{}} : \
+                     ${if exists {/var/lib/greylistd/whitelist-hosts}\
+                                 {/var/lib/greylistd/whitelist-hosts}{}}
+  !authenticated = *
+  !acl           = acl_whitelist_local_deny
+  domains        = +local_domains : +relay_to_domains
+  verify         = recipient/callout=20s,use_sender,defer_ok
+  condition      = ${if def:acl_m0 {1}}
+  condition      = ${readsocket{/var/run/greylistd/socket}\
+                               {--grey \
+                                ${mask:$sender_host_address/27} \
+                                $sender_address \
+                                $local_part@$domain}\
+                               {5s}{}{false}}
+### END Selective Greylisting
