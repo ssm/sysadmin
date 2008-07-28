@@ -1,3 +1,15 @@
+# Selective greylisting configuration for exim4
+#
+# This will greylist the user if one of the following occurs:
+# * Client does not have forward/reverse set in DNS
+# * Client sends a funky HELO
+# * Client IP is listed on any number of configured DNSBLs
+#
+# An optional greylistd_users file can be used to only greylist users in this
+# file, or anyone not in this file.
+#
+# You will need "greylistd" installed for this to work.
+#
 ### BEGIN Selective Greylisting
 
 ## Stig Sandbeck Mathisen
