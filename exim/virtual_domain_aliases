@@ -1,0 +1,38 @@
+# Exim router for virtual domains
+#
+# Stig Sandbeck Mathisen <ssm@fnord.no>
+
+# Installation:
+#
+# Add the contents of this file to the "routers" section, at an appropriate
+# place
+#
+# For debian with split-config, use a file name prefixed by a number to adjust
+# precedence, like /etc/exim4/conf.d/router/350_local_virtual_domain_aliases
+#
+# Usage: 
+#
+# This file assumes that you have your virtualdomain setup in
+# /etc/mail/domains, with one file per domain, where the file name is the same
+# as the domain name.  The content is the same as a normal aliases file.
+#
+# Example domain "example.org" in the file /etc/mail/domains/example.org
+#
+# root:       someone@example.org
+# postmaster: someone
+# abuse:      postmaster
+# info:       someone
+# nobody:     /dev/null
+# someone:    my_mail_account@my_mail_provider.example.com
+
+virtual_domain_aliases:
+  debug_print = "R: virtual_domain_aliases for $local_part@$domain"
+  driver = redirect
+  allow_defer
+  allow_fail
+  domains = dsearch;/etc/mail/domains
+  data = ${expand:${lookup{$local_part}lsearch*@{/etc/mail/domains/$domain}}}
+  retry_use_local_part
+  pipe_transport   = address_pipe
+  file_transport   = address_file
+
